@@ -1,0 +1,69 @@
+---
+- name: Install necessary packages for development
+  hosts: webservers
+  become: false
+  connection: local
+
+  tasks:
+    - name: Install software
+      homebrew:
+        name: "{{ apps }}"
+        state: present
+
+- name: Set up local environment
+  hosts: webservers
+  connection: local
+
+  tasks:
+    - name: Create .env file and copy to /tmp/.env
+      copy:
+        content: |
+          REALM_NAME=chatapp
+          WEBAPP=http://localhost:8080
+          CACHE_SERVICE=http://localhost:8081
+          DB_SERVICE=http://localhost:8082
+        dest: .env
+
+    - name: Download a file
+      get_url:
+        url: https://github.com/cmwylie19/unique.co/blob/master/README.md
+        dest: /tmp/whateverfile
+        mode: 0777
+
+- name: Test connectivity to webserver
+  hosts: webservers
+  connection: local
+  become: false
+  tasks:
+    - name: Connect to server
+      uri:
+        url: http://localhost:8080
+        return_content: true
+        status_code: 200
+      register: output
+
+    - name: Debug output
+      debug:
+        msg: "{{ output.connection }}"
+
+- name: Source the /tmp/.env
+  hosts: webservers
+  connection: local
+  tasks:
+    - name: Add .env to system environmental variables
+      shell: source .env
+
+- name: Create a new user
+  hosts: webservers
+  connection: local
+
+  vars:
+    username: fred
+    password: bedrock
+
+  tasks:
+    - name: Create user
+      user:
+        name: "{{ username }}"
+        password: "{{ password | password_hash('sha512') }}"
+        state: present
